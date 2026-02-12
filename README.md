@@ -1,3 +1,1 @@
-# Project Root
-
-Scaffolded project structure.
+QalaVoice
