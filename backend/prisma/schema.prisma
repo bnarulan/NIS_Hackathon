@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  RESIDENT
+  CONTRACTOR
+  CONTROLLER
+}
+
+enum PostStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+}
+
+enum PointsType {
+  LIKE
+  COMMENT
+  CLOSE
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  iin          String        @unique
+  passwordHash String
+  role         Role
+  points       Int           @default(0)
+
+  // Посты пользователя (созданные как житель)
+  posts         Post[]
+
+  // Посты, назначенные пользователю как подрядчику
+  assignedPosts Post[]       @relation("AssignedPosts")
+
+  comments     Comment[]
+  likes        Like[]
+
+  // Отчёты подрядчика
+  contractorReports ContractorReport[] @relation("UserContractorReports")
+
+  // SLA записи
+  slas           SLA[]                 @relation("UserSLAs")
+
+  pointsLogs   PointsLog[]
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Post {
+  id           Int           @id @default(autoincrement())
+  userId       Int
+  user         User          @relation(fields: [userId], references: [id])
+
+  category     String
+  description  String
+  lat          Float?
+  lng          Float?
+  photoUrl     String?
+
+  dangerLevel     Int        @default(1)
+  locationWeight  Int        @default(5)
+  priorityScore   Int        @default(0)
+
+  status       PostStatus    @default(OPEN)
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  assignedContractorId Int?
+  assignedContractor   User?         @relation("AssignedPosts", fields: [assignedContractorId], references: [id])
+
+  comments     Comment[]
+  likes        Like[]
+  contractorReport ContractorReport?
+  sla          SLA?
+  pointsLogs   PointsLog[]
+
+  @@index([status])
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  text      String
+
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+}
+
+model Like {
+  id        Int      @id @default(autoincrement())
+
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+}
+
+model ContractorReport {
+  id             Int      @id @default(autoincrement())
+  postId         Int      @unique
+  post           Post     @relation(fields: [postId], references: [id])
+
+  contractorId   Int
+  contractor     User     @relation("UserContractorReports", fields: [contractorId], references: [id])
+
+  beforePhotoUrl String?
+  afterPhotoUrl  String?
+
+  startedAt      DateTime @default(now())
+  completedAt    DateTime?
+  durationSeconds Int?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model SLA {
+  id           Int      @id @default(autoincrement())
+  postId       Int      @unique
+  post         Post     @relation(fields: [postId], references: [id])
+
+  contractorId Int
+  contractor   User     @relation("UserSLAs", fields: [contractorId], references: [id])
+
+  targetHours  Int      @default(24)
+  breached     Boolean  @default(false)
+  resolvedAt   DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model PointsLog {
+  id        Int        @id @default(autoincrement())
+
+  userId    Int
+  user      User       @relation(fields: [userId], references: [id])
+
+  postId    Int?
+  post      Post?      @relation(fields: [postId], references: [id])
+
+  type      PointsType
+  points    Int
+
+  createdAt DateTime   @default(now())
+}
